@@ -1,0 +1,28 @@
+%% Compila todo
+c(central), c(taxi), c(viajero).
+
+%% Inicia la central
+central:abre_central({0,0}).
+
+%% Registra un taxi
+taxi:registra_taxi(t1, zona_sur).
+
+%% Solicita un taxi desde aeropuerto
+viajero:solicitar_taxi(maria, aeropuerto, zona_centro).
+
+%% Simula que el taxi inicia el servicio
+taxi:servicio_iniciado(t1).
+
+%% Simula que el taxi completa el servicio
+taxi:servicio_completado(t1).
+
+%% Revisa historial
+central:viajes_completados().
+
+%% Respuesta esperada
+Recibe: solicitud de taxi de maria desde aeropuerto hacia zona_centro
+Recibe: registro de taxi t1 desde zona_sur
+Recibe: Taxi t1 asignado a maria (Viaje 1)
+...
+Viaje 1 | Taxi: t1 | Viajero: maria | De: aeropuerto → A: zona_centro
+
