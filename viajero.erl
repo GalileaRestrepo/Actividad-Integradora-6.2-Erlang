@@ -11,11 +11,13 @@
 %%% =============================
 %%% COMANDO: solicitar_taxi/3
 %%% =============================
-solicitar_taxi(Nombre, aeropuerto, Destino) when is_atom(Nombre), is_atom(Destino) ->
-    spawn(?MODULE, loop, [{Nombre, aeropuerto, Destino}]);
+zonas_validas() -> [aeropuerto, zona_norte, zona_sur, zona_centro].
 
-solicitar_taxi(_, Origen, _) ->
-    io:format("Error: Solo se permiten solicitudes desde el aeropuerto. Origen inválido: ~p~n", [Origen]).
+solicitar_taxi(Nombre, Origen, Destino) when is_atom(Nombre), is_atom(Origen), is_atom(Destino) ->
+    case lists:member(Origen, zonas_validas()) andalso lists:member(Destino, zonas_validas()) of
+        true -> spawn(?MODULE, loop, [{Nombre, Origen, Destino}]);
+        false -> io:format("Zona inválida: origen ~p o destino ~p~n", [Origen, Destino])
+    end.
 
 %%% ==========================
 %%% COMANDO: cancelar_taxi/1
