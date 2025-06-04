@@ -1,28 +1,95 @@
-%% Compila todo
-c(central), c(taxi), c(viajero).
+================================
+PRUEBA COMPLETA DEL SISTEMA
+================================
 
-%% Inicia la central
-central:abre_central({0,0}).
+Abre tres terminales separados para los nodos:
 
-%% Registra un taxi
-taxi:registra_taxi(t1, zona_sur).
+=========================
+TERMINAL 1 - NODO CENTRAL
+=========================
 
-%% Solicita un taxi desde aeropuerto
-viajero:solicitar_taxi(maria, aeropuerto, zona_centro).
+> erl -name central@localhost -setcookie taxi_cookie
+> c(central).
+> central:abre_central({0, 0}).
+=> Central iniciada en {0,0}
 
-%% Simula que el taxi inicia el servicio
-taxi:servicio_iniciado(t1).
+=========================
+TERMINAL 2 - NODO TAXI
+=========================
 
-%% Simula que el taxi completa el servicio
-taxi:servicio_completado(t1).
+> erl -name taxi@localhost -setcookie taxi_cookie
+> c(taxi).
+> net_adm:ping('central@localhost').
+=> pong
 
-%% Revisa historial
-central:viajes_completados().
+> taxi:registra_taxi(t1, aeropuerto).
+=> Taxi t1 registrado en aeropuerto con estado disponible
 
-%% Respuesta esperada
-Recibe: solicitud de taxi de maria desde aeropuerto hacia zona_centro
-Recibe: registro de taxi t1 desde zona_sur
-Recibe: Taxi t1 asignado a maria (Viaje 1)
-...
-Viaje 1 | Taxi: t1 | Viajero: maria | De: aeropuerto → A: zona_centro
+> taxi:registra_taxi(t2, zona_norte).
+=> Taxi t2 registrado en zona_norte con estado disponible
 
+> taxi:consultar_estado(t1).
+=> Taxi t1 | Estado: disponible | Ubicación: aeropuerto
+
+=========================
+TERMINAL 3 - NODO VIAJERO
+=========================
+
+> erl -name viajero@localhost -setcookie taxi_cookie
+> c(viajero).
+> net_adm:ping('central@localhost').
+=> pong
+
+> viajero:solicita_taxi(gali, aeropuerto, zona_centro).
+=> Recibe: solicitud de taxi de gali desde aeropuerto hacia zona_centro
+=> Taxi asignado: t1 con id de viaje 1
+
+=========================
+TERMINAL 2 - Nodo TAXI (servicio en curso)
+=========================
+
+> taxi:servicio_iniciado(t1).
+=> Central: Servicio iniciado por taxi t1
+
+> taxi:servicio_completado(t1).
+=> Central: Taxi t1 completó viaje
+=> El viajero gali ha sido terminado
+
+=========================
+TERMINAL 3 - Nodo VIAJERO (cancelación opcional)
+=========================
+> viajero:solicita_taxi(luisa, zona_norte, zona_sur).
+=> Recibe: solicitud de taxi de luisa desde zona_norte hacia zona_sur
+=> Taxi asignado: t2 con id de viaje 2
+
+> viajero:cancelar_taxi(luisa).
+=> Central: Cancelando solicitud de luisa
+
+=========================
+TERMINAL 1 - Nodo CENTRAL (consultas)
+=========================
+> central:lista_taxis().
+=> === Taxis activos ===
+=> Taxi: t1 | PID: <0.X.0> | Ubicación: zona_centro
+=> Taxi: t2 | PID: <0.Y.0> | Ubicación: zona_norte
+
+> central:lista_viajeros().
+=> === Viajeros activos ===
+=> (Vacía si todos han terminado)
+
+> central:viajes_completados().
+=> === Viajes completados ===
+=> Viaje 1 | Taxi: t1 | Viajero: gali | De: aeropuerto → A: zona_centro
+
+=========================
+TERMINAL 2 - Nodo TAXI (eliminación)
+=========================
+> taxi:elimina_taxi(t2).
+=> Taxi t2 eliminado correctamente
+
+=========================
+TERMINAL 1 - Nodo CENTRAL (cierre)
+=========================
+> central:cierra_central().
+=> Recibe: cierre de central. Terminando taxis y viajeros...
+=> Central apagada.
