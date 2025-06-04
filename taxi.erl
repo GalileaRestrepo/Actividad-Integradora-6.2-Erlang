@@ -1,11 +1,14 @@
 %%% Archivo: taxi.erl
-%%% Autoras: TuNombre y Matrícula aquí
+%%% Autoras: Anna Galilea Restrepo Martínez A01178273 y Regina Romero Alvarado A00840840
 
 -module(taxi).
 -export([
     registra_taxi/2,
-    loop/3
-    consultar_estado/1
+    loop/3,
+    consultar_estado/1,
+    elimina_taxi/1,
+    servicio_iniciado/1,
+    servicio_completado/1
 ]).
 
 %%% ===========================
@@ -33,6 +36,36 @@ consultar_estado(TaxiId) when is_atom(TaxiId) ->
     after 2000 ->
         io:format("No se encontró el taxi ~p en central~n", [TaxiId])
     end.
+
+%%% =============================
+%%% COMANDO: elimina_taxi/1
+%%% =============================
+elimina_taxi(TaxiId) when is_atom(TaxiId) ->
+    central ! {eliminar_taxi, TaxiId, self()},
+    receive
+        {eliminado, TaxiId} ->
+            io:format("Taxi ~p eliminado correctamente.~n", [TaxiId]);
+        {no_se_puede_eliminar, TaxiId, Motivo} ->
+            io:format("No se pudo eliminar taxi ~p: ~s~n", [TaxiId, Motivo]);
+        _ ->
+            io:format("Respuesta inesperada al intentar eliminar taxi ~p~n", [TaxiId])
+    after 2000 ->
+        io:format("Timeout al intentar eliminar taxi ~p~n", [TaxiId])
+    end.
+
+%%% ================================
+%%% COMANDO: servicio_iniciado/1
+%%% ================================
+servicio_iniciado(TaxiId) when is_atom(TaxiId) ->
+    central ! {servicio_iniciado, TaxiId},
+    io:format("Taxi ~p notifica inicio de servicio.~n", [TaxiId]).
+
+%%% ===================================
+%%% COMANDO: servicio_completado/1
+%%% ===================================
+servicio_completado(TaxiId) when is_atom(TaxiId) ->
+    central ! {servicio_completado, TaxiId},
+    io:format("Taxi ~p notifica fin de servicio.~n", [TaxiId]).
 
 %%% ======================
 %%% LOOP DEL TAXI
