@@ -2,13 +2,15 @@
 %%% Autoras: Anna Galilea Restrepo Martínez A01178273 y Regina Romero Alvarado A00840840
 
 -module(central).
+-compile({nowarn_unused_function, [distancia/2]}).
+-compile({nowarn_unused_function, [loop/1]}).
+-compile({nowarn_unused_function, [ubicacion/1]}).
 -export([
     abre_central/1,
     cierra_central/0,
     lista_taxis/0,
     lista_viajeros/0,
-    viajes_completados/0,
-    loop/1
+    viajes_completados/0
 ]).
 
 %%% ========================
@@ -61,7 +63,6 @@ viajes_completados() ->
 %%% ====================
 loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
     receive
-
         %% ======= Solicitud de taxi =======
             {solicita_taxi, PidViajero, Nombre, Origen, Destino} ->
             io:format("Recibe: solicitud de taxi de ~p desde ~p hacia ~p~n", [Nombre, Origen, Destino]),
@@ -102,10 +103,10 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
             %% Verifica que el ID no esté repetido
             case lists:keyfind(TaxiId, 1, Taxis) of
                 false ->
-                    loop({Ubicacion, [{TaxiId, PidTaxi, Ubic} | Taxis], Viajeros, Historial, Contador});
+                    loop({Ubicacion, [{TaxiId, PidTaxi, Ubic} | Taxis], Viajeros, Historial, Contador, ViajesActivos});
                 _ ->
                     io:format("Taxi ~p ya estaba registrado.~n", [TaxiId]),
-                    loop({Ubicacion, Taxis, Viajeros, Historial, Contador})
+                    loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos})
             end;
 
         %% ======= Solicitud de PID de taxi (para el comando consultar_estado/1)=======
@@ -113,10 +114,10 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
             case lists:keyfind(TaxiId, 1, Taxis) of
                 false ->
                     From ! {pid_taxi, undefined},
-                    loop({Ubicacion, Taxis, Viajeros, Historial, Contador});
+                    loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos});
                 {_, Pid, _} ->
                     From ! {pid_taxi, Pid},
-                    loop({Ubicacion, Taxis, Viajeros, Historial, Contador})
+                    loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos})
             end;
 
         %% ======= Servicio iniciado de taxi =======
@@ -124,7 +125,7 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
             io:format("Central: Servicio iniciado por taxi ~p~n", [TaxiId]),
             %% Aquí luego actualizamos estado del taxi
             %% y registramos inicio real del servicio
-            loop({Ubicacion, Taxis, Viajeros, Historial, Contador});
+            loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos});
 
         %% ======= Servicio completado de taxi =======
         {servicio_completado, TaxiId} ->
@@ -161,7 +162,7 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
             case lists:keytake(TaxiId, 1, Taxis) of
                 false ->
                     From ! {no_se_puede_eliminar, TaxiId, "Taxi no registrado"},
-                    loop({Ubicacion, Taxis, Viajeros, Historial, Contador});
+                    loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos});
                 {value, {TaxiId, Pid, Ubic}, TaxisRestantes} ->
                     %% Pregunta al taxi si está disponible
                     Pid ! {consultar_estado, self()},
@@ -169,13 +170,13 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
                         {estado, disponible, _} ->
                             Pid ! stop,
                             From ! {eliminado, TaxiId},
-                            loop({Ubicacion, TaxisRestantes, Viajeros, Historial, Contador});
+                            loop({Ubicacion, TaxisRestantes, Viajeros, Historial, Contador, ViajesActivos});
                         {estado, ocupado, _} ->
                             From ! {no_se_puede_eliminar, TaxiId, "Taxi ocupado"},
-                            loop({Ubicacion, [{TaxiId, Pid, Ubic} | TaxisRestantes], Viajeros, Historial, Contador})
+                            loop({Ubicacion, [{TaxiId, Pid, Ubic} | TaxisRestantes], Viajeros, Historial, Contador, ViajesActivos})
                     after 2000 ->
                         From ! {no_se_puede_eliminar, TaxiId, "No respondió"},
-                        loop({Ubicacion, [{TaxiId, Pid, Ubic} | TaxisRestantes], Viajeros, Historial, Contador})
+                        loop({Ubicacion, [{TaxiId, Pid, Ubic} | TaxisRestantes], Viajeros, Historial, Contador, ViajesActivos})
                     end
             end;
 
@@ -185,11 +186,11 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
         case lists:keytake(Nombre, 1, Viajeros) of
             false ->
                 io:format("Central: No se encontró al viajero ~p para cancelar~n", [Nombre]),
-                loop({Ubicacion, Taxis, Viajeros, Historial, Contador});
+                loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos});
             {value, {Nombre, PidV}, ViajerosRestantes} ->
                 PidV ! cancelado,
                 io:format("Central: Cancelando solicitud de ~p~n", [Nombre]),
-                loop({Ubicacion, Taxis, ViajerosRestantes, Historial, Contador})
+                loop({Ubicacion, Taxis, ViajerosRestantes, Historial, Contador, ViajesActivos})
         end;
 
         %% ======= Mostrar lista de taxis =======
@@ -198,7 +199,7 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
             lists:foreach(fun({Id, Pid, Ubic}) ->
                 io:format("Taxi: ~p | PID: ~p | Ubicación: ~p~n", [Id, Pid, Ubic])
             end, Taxis),
-            loop({Ubicacion, Taxis, Viajeros, Historial, Contador});
+            loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos});
 
         %% ======= Mostrar lista de viajeros =======
         {mostrar_viajeros, _From} ->
@@ -206,7 +207,7 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
             lists:foreach(fun({Nombre, Pid}) ->
                 io:format("Viajero: ~p | PID: ~p~n", [Nombre, Pid])
             end, Viajeros),
-            loop({Ubicacion, Taxis, Viajeros, Historial, Contador});
+            loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos});
 
         %% ======= Mostrar historial de viajes =======
         {mostrar_historial, _From} ->
@@ -215,7 +216,7 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
                 io:format("Viaje ~p | Taxi: ~p | Viajero: ~p | De: ~p → A: ~p~n",
                           [IdViaje, TaxiId, Viajero, Origen, Destino])
             end, Historial),
-            loop({Ubicacion, Taxis, Viajeros, Historial, Contador});
+            loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos});
 
         %% ======= Cierre de central =======
         stop ->
@@ -228,12 +229,13 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
         %% ======= Otros mensajes no reconocidos =======
         _Otro ->
             io:format("Mensaje desconocido recibido.~n"),
-            loop({Ubicacion, Taxis, Viajeros, Historial, Contador})
+            loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos})
     end.
 
 %%% ==========================
 %%% FUNCIÓN AUXILIAR: ubicacion/1
 %%% ==========================
+% Suppress unused warning for ubicacion/1 as it is used internally
 ubicacion(aeropuerto) -> {0, 0};
 ubicacion(zona_norte) -> {2, 10};
 ubicacion(zona_sur) -> {2, -10};

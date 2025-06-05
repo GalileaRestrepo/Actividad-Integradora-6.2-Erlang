@@ -3,25 +3,31 @@
 
 -module(taxi).
 -export([
-    registra_taxi/2,
-    loop/3,
-    consultar_estado/1,
+    registra_taxi/3,
+    loop/4,
+    consultar_estado/2,
     elimina_taxi/1,
     servicio_iniciado/1,
     servicio_completado/1
 ]).
 
 %%% ===========================
-%%% COMANDO: registra_taxi/2
+%%% COMANDO: registra_taxi/3
 %%% ===========================
-registra_taxi(TaxiId, UbicacionInicial) when is_atom(TaxiId), is_atom(UbicacionInicial) ->
-    spawn(?MODULE, loop, [TaxiId, disponible, UbicacionInicial]).
+%%% Este comando se usa para registrar un taxi en la central.
+%%% Como estamos trabajando con nodos distribuidos, se pasa explícitamente
+%%% el nodo donde está corriendo la central (ej. 'central@laptop-de-juan').
+%%% Así evitamos depender de un hostname fijo y el código es portable para otros usuarios.
+
+registra_taxi(TaxiId, UbicacionInicial, NodoCentral) 
+when is_atom(TaxiId), is_atom(UbicacionInicial), is_atom(NodoCentral) ->
+    spawn(?MODULE, loop, [TaxiId, disponible, UbicacionInicial, NodoCentral]).
 
 %%% ===============================
 %%% COMANDO: consultar_estado/1
 %%% ===============================
-consultar_estado(TaxiId) when is_atom(TaxiId) ->
-    central ! {solicitar_pid, TaxiId, self()},
+consultar_estado(TaxiId, NodoCentral) when is_atom(TaxiId), is_atom(NodoCentral) ->
+    {central, NodoCentral} ! {solicitar_pid, TaxiId, self()},
     receive
         {pid_taxi, undefined} ->
             io:format("Taxi ~p no está registrado.~n", [TaxiId]);
@@ -36,6 +42,7 @@ consultar_estado(TaxiId) when is_atom(TaxiId) ->
     after 2000 ->
         io:format("No se encontró el taxi ~p en central~n", [TaxiId])
     end.
+
 
 %%% =============================
 %%% COMANDO: elimina_taxi/1
@@ -70,23 +77,20 @@ servicio_completado(TaxiId) when is_atom(TaxiId) ->
 %%% ======================
 %%% LOOP DEL TAXI
 %%% ======================
-loop(TaxiId, Estado, Ubicacion) ->
-    %% Al iniciar, se registra con la central
-    central ! {registrar_taxi, TaxiId, self(), Ubicacion},
+loop(TaxiId, Estado, Ubicacion, NodoCentral) ->
+    {central, NodoCentral} ! {registrar_taxi, TaxiId, self(), Ubicacion},
 
     io:format("Taxi ~p registrado en ~p con estado ~p~n", [TaxiId, Ubicacion, Estado]),
 
     receive
-        %% Aquí luego se reciben comandos como servicio_asignado, etc.
-            {consultar_estado, From} ->
+        {consultar_estado, From} ->
             From ! {estado, Estado, Ubicacion},
-            loop(TaxiId, Estado, Ubicacion);
+            loop(TaxiId, Estado, Ubicacion, NodoCentral);
 
         stop ->
             io:format("Taxi ~p: proceso terminado.~n", [TaxiId]);
 
         _Otro ->
             io:format("Taxi ~p recibió un mensaje desconocido~n", [TaxiId]),
-            loop(TaxiId, Estado, Ubicacion)
-        
+            loop(TaxiId, Estado, Ubicacion, NodoCentral)
     end.
