@@ -187,17 +187,19 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
             end;
 
         %% ======= Cancelar taxi de viajero =======
-        {cancelar_taxi, Nombre} ->
-        %% Buscar al viajero
-        case lists:keytake(Nombre, 1, Viajeros) of
-            false ->
-                io:format("Central: No se encontró al viajero ~p para cancelar~n", [Nombre]),
-                loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos});
-            {value, {Nombre, PidV}, ViajerosRestantes} ->
-                PidV ! cancelado,
-                io:format("Central: Cancelando solicitud de ~p~n", [Nombre]),
-                loop({Ubicacion, Taxis, ViajerosRestantes, Historial, Contador, ViajesActivos})
-        end;
+        {cancelar_taxi, Nombre, From} ->
+            case lists:keytake(Nombre, 1, Viajeros) of
+                false ->
+                    io:format("Central: No se encontró al viajero ~p para cancelar~n", [Nombre]),
+                    From ! {cancelado_fallido, Nombre},
+                    loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos});
+                {value, {Nombre, PidV}, ViajerosRestantes} ->
+                    PidV ! cancelado,
+                    io:format("Central: Cancelando solicitud de ~p~n", [Nombre]),
+                    From ! {cancelado_exitoso, Nombre},
+                    loop({Ubicacion, Taxis, ViajerosRestantes, Historial, Contador, ViajesActivos})
+            end;
+
 
         %% ======= Mostrar lista de taxis =======
         {mostrar_taxis, _From} ->

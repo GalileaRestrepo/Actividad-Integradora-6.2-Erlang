@@ -31,7 +31,16 @@ when is_atom(Nombre), is_atom(Origen), is_atom(Destino), is_atom(NodoCentral) ->
 %%% COMANDO: cancelar_taxi/2
 %%% ==========================
 cancelar_taxi(Nombre, NodoCentral) when is_atom(Nombre), is_atom(NodoCentral) ->
-    {central, NodoCentral} ! {cancelar_taxi, Nombre}.
+    {central, NodoCentral} ! {cancelar_taxi, Nombre, self()},
+    receive
+        {cancelado_exitoso, Nombre} ->
+            io:format("Se canceló correctamente la solicitud de ~p~n", [Nombre]);
+        {cancelado_fallido, Nombre} ->
+            io:format("No se encontró al viajero ~p para cancelar~n", [Nombre])
+    after 2000 ->
+        io:format("Timeout: No se recibió respuesta al cancelar ~p~n", [Nombre])
+    end.
+
 
 %%% ======================
 %%% LOOP DEL VIAJERO
