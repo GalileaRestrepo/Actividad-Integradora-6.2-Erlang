@@ -2,7 +2,7 @@
 %%% Autoras: Anna Galilea Restrepo Martínez A01178273 y Regina Romero Alvarado A00840840
 
 -module(central).
--compile({nowarn_unused_function, [distancia/2]}).
+-compile({nowarn_unused_function, [distancia/2]}). % Suprimir advertencia de función no utilizada
 -compile({nowarn_unused_function, [loop/1]}).
 -compile({nowarn_unused_function, [ubicacion/1]}).
 -export([
@@ -18,13 +18,13 @@
 %%% COMANDO: abre_central/1
 %%% ========================
 abre_central(Ubicacion) when is_tuple(Ubicacion) ->
-    case whereis(central) of
-        undefined ->
-            Pid = spawn(?MODULE, loop, [{Ubicacion, [], [], [], 1, []}]),
+    case whereis(central) of 
+        undefined -> % Si no hay una central activa, la crea
+            Pid = spawn(?MODULE, loop, [{Ubicacion, [], [], [], 1, []}]), % Inicia la central con ubicación, taxis, viajeros, historial, contador y viajes activos
             register(central, Pid),
             io:format("Central iniciada en ~p~n", [Ubicacion]),
             {ok, Pid};
-        _ ->
+        _ -> % Si ya hay una central activa, no la vuelve a iniciar
             io:format("Ya existe una central activa.~n"),
             {error, ya_iniciada}
     end.
@@ -243,12 +243,11 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
 %%% ==========================
 %%% FUNCIÓN AUXILIAR: ubicacion/1
 %%% ==========================
-% Suppress unused warning for ubicacion/1 as it is used internally
 ubicacion(aeropuerto) -> {0, 0};
 ubicacion(zona_norte) -> {2, 10};
 ubicacion(zona_sur) -> {2, -10};
 ubicacion(zona_centro) -> {5, 5};
-ubicacion(_) -> {0, 0}.  % fallback
+ubicacion(_) -> {0, 0}.  
 
 %%% ==========================
 %%% FUNCIÓN AUXILIAR: distancia/2
