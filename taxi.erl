@@ -6,9 +6,9 @@
     registra_taxi/3,
     loop/4,
     consultar_estado/2,
-    elimina_taxi/1,
-    servicio_iniciado/1,
-    servicio_completado/1
+    elimina_taxi/2,
+    servicio_iniciado/2,
+    servicio_completado/2
 ]).
 
 %%% ===========================
@@ -24,7 +24,7 @@ when is_atom(TaxiId), is_atom(UbicacionInicial), is_atom(NodoCentral) ->
     spawn(?MODULE, loop, [TaxiId, disponible, UbicacionInicial, NodoCentral]).
 
 %%% ===============================
-%%% COMANDO: consultar_estado/1
+%%% COMANDO: consultar_estado/2
 %%% ===============================
 consultar_estado(TaxiId, NodoCentral) when is_atom(TaxiId), is_atom(NodoCentral) ->
     {central, NodoCentral} ! {solicitar_pid, TaxiId, self()},
@@ -45,10 +45,10 @@ consultar_estado(TaxiId, NodoCentral) when is_atom(TaxiId), is_atom(NodoCentral)
 
 
 %%% =============================
-%%% COMANDO: elimina_taxi/1
+%%% COMANDO: elimina_taxi/2
 %%% =============================
-elimina_taxi(TaxiId) when is_atom(TaxiId) ->
-    central ! {eliminar_taxi, TaxiId, self()},
+elimina_taxi(TaxiId, NodoCentral) when is_atom(TaxiId), is_atom(NodoCentral) ->
+    {central, NodoCentral} ! {eliminar_taxi, TaxiId, self()},
     receive
         {eliminado, TaxiId} ->
             io:format("Taxi ~p eliminado correctamente.~n", [TaxiId]);
@@ -61,18 +61,21 @@ elimina_taxi(TaxiId) when is_atom(TaxiId) ->
     end.
 
 %%% ================================
-%%% COMANDO: servicio_iniciado/1
+%%% COMANDO: servicio_iniciado/2
 %%% ================================
-servicio_iniciado(TaxiId) when is_atom(TaxiId) ->
-    central ! {servicio_iniciado, TaxiId},
+servicio_iniciado(TaxiId, NodoCentral) 
+when is_atom(TaxiId), is_atom(NodoCentral) ->
+    {central, NodoCentral} ! {servicio_iniciado, TaxiId},
     io:format("Taxi ~p notifica inicio de servicio.~n", [TaxiId]).
 
 %%% ===================================
-%%% COMANDO: servicio_completado/1
+%%% COMANDO: servicio_completado/2
 %%% ===================================
-servicio_completado(TaxiId) when is_atom(TaxiId) ->
-    central ! {servicio_completado, TaxiId},
+servicio_completado(TaxiId, NodoCentral) 
+when is_atom(TaxiId), is_atom(NodoCentral) ->
+    {central, NodoCentral} ! {servicio_completado, TaxiId},
     io:format("Taxi ~p notifica fin de servicio.~n", [TaxiId]).
+
 
 %%% ======================
 %%% LOOP DEL TAXI
