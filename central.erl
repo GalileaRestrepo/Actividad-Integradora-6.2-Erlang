@@ -2,9 +2,13 @@
 %%% Autoras: Anna Galilea Restrepo Martínez A01178273 y Regina Romero Alvarado A00840840
 
 -module(central).
--compile({nowarn_unused_function, [distancia/2]}). % Suprimir advertencia de función no utilizada
+
+% Suprimir advertencias de funciones no utilizadas
+-compile({nowarn_unused_function, [distancia/2]}).
 -compile({nowarn_unused_function, [loop/1]}).
 -compile({nowarn_unused_function, [ubicacion/1]}).
+
+% Exportar funciones públicas del módulo
 -export([
     abre_central/1,
     cierra_central/0,
@@ -17,6 +21,7 @@
 %%% ========================
 %%% COMANDO: abre_central/1
 %%% ========================
+% Inicia la central si no existe una ya activa
 abre_central(Ubicacion) when is_tuple(Ubicacion) ->
     case whereis(central) of 
         undefined -> % Si no hay una central activa, la crea
@@ -32,13 +37,14 @@ abre_central(Ubicacion) when is_tuple(Ubicacion) ->
 %%% =========================
 %%% COMANDO: cierra_central/0
 %%% =========================
+% Cierra la central si está activa
 cierra_central() ->
     case whereis(central) of
         undefined ->
             io:format("No hay una central activa para cerrar.~n"),
             {error, no_activa};
         Pid ->
-            Pid ! stop,
+            Pid ! stop, % Envía mensaje de parada al proceso central
             unregister(central),
             io:format("Central cerrada correctamente.~n"),
             ok
@@ -47,14 +53,17 @@ cierra_central() ->
 %%% =========================
 %%% COMANDOS DE VISUALIZACIÓN
 %%% =========================
+% Solicita la lista de taxis a la central
 lista_taxis() ->
     central ! {mostrar_taxis, self()},
     ok.
 
+% Solicita la lista de viajeros a la central
 lista_viajeros() ->
     central ! {mostrar_viajeros, self()},
     ok.
 
+% Solicita el historial de viajes a la central
 viajes_completados() ->
     central ! {mostrar_historial, self()},
     ok.
@@ -62,21 +71,23 @@ viajes_completados() ->
 %%% ====================
 %%% LOOP PRINCIPAL
 %%% ====================
+% Bucle principal que maneja los mensajes recibidos por la central
 loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
     receive
         %% ======= Solicitud de taxi =======
-            {solicita_taxi, PidViajero, Nombre, Origen, Destino} ->
+        {solicita_taxi, PidViajero, Nombre, Origen, Destino} ->
             io:format("Recibe: solicitud de taxi de ~p desde ~p hacia ~p~n", [Nombre, Origen, Destino]),
             case lists:keyfind(Nombre, 1, Viajeros) of
                 false ->
-                    %% Buscar taxis disponibles
+                    % Buscar taxis disponibles
                     Disponibles = [ {Id, Pid, U} || {Id, Pid, U} <- Taxis, is_pid(Pid)],
                     case Disponibles of
                         [] ->
+                            % No hay taxis disponibles
                             PidViajero ! {no_disponible},
                             loop({Ubicacion, Taxis, [{Nombre, PidViajero} | Viajeros], Historial, Contador, ViajesActivos});
                         _ ->
-                            %% Seleccionar el más cercano
+                            % Selecciona el taxi más cercano al origen
                             OrigenCoord = ubicacion(Origen),
                             {TaxiAsignado, PidTaxi, _} = lists:foldl(
                                 fun(Elem, MinSoFar) ->
@@ -88,25 +99,23 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
                                 hd(Disponibles),
                                 tl(Disponibles)
                             ),  
-                            
-                            %% Enviar mensajes de asignación
+                            % Asigna taxi y notifica a viajero y taxi
                             PidViajero ! {taxi_asignado, TaxiAsignado, Contador},
                             PidTaxi ! {servicio_asignado, Contador, PidViajero, Origen, Destino},
-
-                            %% Agregar viaje activo
+                            % Agrega el viaje a la lista de viajes activos
                             NuevoViaje = {TaxiAsignado, Contador, PidViajero, Origen, Destino},
                             loop({Ubicacion, Taxis, [{Nombre, PidViajero} | Viajeros], Historial, Contador + 1, [NuevoViaje | ViajesActivos]})
                     end;
                 _ ->
+                    % El viajero ya tiene una solicitud activa
                     io:format("Viajero ~p ya tiene una solicitud activa.~n", [Nombre]),
                     loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos})
             end;
 
-
         %% ======= Registro de taxi =======
         {registrar_taxi, TaxiId, PidTaxi, Ubic} ->
             io:format("Recibe: registro de taxi ~p desde ~p~n", [TaxiId, Ubic]),
-            %% Verifica que el ID no esté repetido
+            % Verifica que el ID no esté repetido
             case lists:keyfind(TaxiId, 1, Taxis) of
                 false ->
                     loop({Ubicacion, [{TaxiId, PidTaxi, Ubic} | Taxis], Viajeros, Historial, Contador, ViajesActivos});
@@ -115,7 +124,7 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
                     loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos})
             end;
 
-        %% ======= Solicitud de PID de taxi (para el comando consultar_estado/1)=======
+        %% ======= Solicitud de PID de taxi =======
         {solicitar_pid, TaxiId, From} ->
             case lists:keyfind(TaxiId, 1, Taxis) of
                 false ->
@@ -129,8 +138,7 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
         %% ======= Servicio iniciado de taxi =======
         {servicio_iniciado, TaxiId} ->
             io:format("Central: Servicio iniciado por taxi ~p~n", [TaxiId]),
-            %% Aquí luego actualizamos estado del taxi
-            %% y registramos inicio real del servicio
+            % Aquí se podría actualizar el estado del taxi
             loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos});
 
         %% ======= Servicio completado de taxi =======
@@ -140,28 +148,23 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
                     io:format("Central: Taxi ~p no tiene viaje activo.~n", [TaxiId]),
                     loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos});
                 {value, {TaxiId, IdViaje, PidViajero, Origen, Destino}, ViajesRestantes} ->
-
-                %% Obtener el nombre del viajero a partir del Pid
-                Nombre = case lists:keyfind(PidViajero, 2, Viajeros) of
-                    {N, _} -> N;
-                    _ -> anonimo
-                end,
-
-                %% Actualizar ubicación y disponibilidad del taxi
-                TaxisActualizados = lists:map(
-                    fun({Id, Pid, _}) when Id =:= TaxiId -> {Id, Pid, ubicacion(Destino)};
-                        (T) -> T
-                    end, Taxis),
-
-                %% Terminar viajero
-                PidViajero ! terminar,
-
-                %% Guardar historial
-                NuevoHistorial = [{IdViaje, TaxiId, Nombre, Origen, Destino} | Historial],
-
-                %% Continuar el loop
-                loop({Ubicacion, TaxisActualizados, Viajeros, NuevoHistorial, Contador, ViajesRestantes})
-        end;
+                    % Obtener el nombre del viajero a partir del Pid
+                    Nombre = case lists:keyfind(PidViajero, 2, Viajeros) of
+                        {N, _} -> N;
+                        _ -> anonimo
+                    end,
+                    % Actualizar ubicación del taxi
+                    TaxisActualizados = lists:map(
+                        fun({Id, Pid, _}) when Id =:= TaxiId -> {Id, Pid, ubicacion(Destino)};
+                            (T) -> T
+                        end, Taxis),
+                    % Terminar viajero
+                    PidViajero ! terminar,
+                    % Guardar historial
+                    NuevoHistorial = [{IdViaje, TaxiId, Nombre, Origen, Destino} | Historial],
+                    % Continuar el loop
+                    loop({Ubicacion, TaxisActualizados, Viajeros, NuevoHistorial, Contador, ViajesRestantes})
+            end;
 
         %% ======= Eliminar taxi =======
         {eliminar_taxi, TaxiId, From} ->
@@ -170,7 +173,7 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
                     From ! {no_se_puede_eliminar, TaxiId, "Taxi no registrado"},
                     loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos});
                 {value, {TaxiId, Pid, Ubic}, TaxisRestantes} ->
-                    %% Pregunta al taxi si está disponible
+                    % Pregunta al taxi si está disponible
                     Pid ! {consultar_estado, self()},
                     receive
                         {estado, disponible, _} ->
@@ -199,7 +202,6 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
                     From ! {cancelado_exitoso, Nombre},
                     loop({Ubicacion, Taxis, ViajerosRestantes, Historial, Contador, ViajesActivos})
             end;
-
 
         %% ======= Mostrar lista de taxis =======
         {mostrar_taxis, _From} ->
@@ -243,6 +245,7 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
 %%% ==========================
 %%% FUNCIÓN AUXILIAR: ubicacion/1
 %%% ==========================
+% Devuelve las coordenadas de una ubicación simbólica
 ubicacion(aeropuerto) -> {0, 0};
 ubicacion(zona_norte) -> {2, 10};
 ubicacion(zona_sur) -> {2, -10};
@@ -252,5 +255,6 @@ ubicacion(_) -> {0, 0}.
 %%% ==========================
 %%% FUNCIÓN AUXILIAR: distancia/2
 %%% ==========================
+% Calcula la distancia euclidiana entre dos coordenadas
 distancia({X1, Y1}, {X2, Y2}) ->
     math:sqrt(math:pow(X2 - X1, 2) + math:pow(Y2 - Y1, 2)).
