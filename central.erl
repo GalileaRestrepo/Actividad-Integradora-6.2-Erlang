@@ -10,7 +10,8 @@
     cierra_central/0,
     lista_taxis/0,
     lista_viajeros/0,
-    viajes_completados/0
+    viajes_completados/0,
+    loop/1
 ]).
 
 %%% ========================
@@ -77,11 +78,16 @@ loop({Ubicacion, Taxis, Viajeros, Historial, Contador, ViajesActivos}) ->
                         _ ->
                             %% Seleccionar el más cercano
                             OrigenCoord = ubicacion(Origen),
-                            {TaxiAsignado, PidTaxi, _} = lists:min(
-                                Disponibles,
-                                fun({_, _, C1}, {_, _, C2}) ->
-                                    distancia(C1, OrigenCoord) < distancia(C2, OrigenCoord)
-                                end),
+                            {TaxiAsignado, PidTaxi, _} = lists:foldl(
+                                fun(Elem, MinSoFar) ->
+                                    case distancia(ubicacion(element(3, Elem)), OrigenCoord) < distancia(ubicacion(element(3, MinSoFar)), OrigenCoord) of
+                                        true -> Elem;
+                                        false -> MinSoFar
+                                    end
+                                end,
+                                hd(Disponibles),
+                                tl(Disponibles)
+                            ),  
                             
                             %% Enviar mensajes de asignación
                             PidViajero ! {taxi_asignado, TaxiAsignado, Contador},
